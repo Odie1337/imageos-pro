@@ -48,6 +48,9 @@ export default function Home() {
             <Link href="/workspace" className="btn primary">
               Open workspace
             </Link>
+            <Link href="/studio" className="btn secondary">
+              Campaign studio
+            </Link>
             <Link href="/pricing" className="btn secondary">
               Pricing
             </Link>

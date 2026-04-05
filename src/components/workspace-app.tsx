@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import JSZip from "jszip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -194,6 +195,7 @@ export default function WorkspaceApp() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [projectName, setProjectName] = useState("Brand campaign batch");
+  const [studioHandoff, setStudioHandoff] = useState<{ brandName?: string; campaign?: string; fontStyle?: string } | null>(null);
   const [recipeName, setRecipeName] = useState("Hero export recipe");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [processing, setProcessing] = useState(false);
@@ -242,6 +244,19 @@ export default function WorkspaceApp() {
         const parsed = JSON.parse(savedWorkspace) as { projectName?: string; recipeName?: string };
         if (parsed.projectName) setProjectName(parsed.projectName);
         if (parsed.recipeName) setRecipeName(parsed.recipeName);
+      } catch {
+        // ignore
+      }
+    }
+
+    const handoff = window.localStorage.getItem("imageos.workspace.handback.v1");
+    if (handoff) {
+      try {
+        const parsed = JSON.parse(handoff) as { brandName?: string; campaign?: string; fontStyle?: string };
+        setStudioHandoff(parsed);
+        if (parsed.brandName || parsed.campaign) {
+          setProjectName(`${parsed.brandName ?? "Studio"} • ${parsed.campaign ?? "campaign"}`);
+        }
       } catch {
         // ignore
       }
@@ -452,7 +467,6 @@ export default function WorkspaceApp() {
     const res = await fetch(dataUrl);
     const blob = await res.blob();
     const file = new File([blob], "demo-image.png", { type: "image/png" });
-    setDemoLoaded(true);
     await loadFiles([file]);
   }
 
@@ -651,6 +665,9 @@ export default function WorkspaceApp() {
                   {entry === "workspace" ? "Workspace" : entry === "library" ? "Library" : "Pricing"}
                 </button>
               ))}
+              <Link href="/studio" className="pill transition border-white/5 bg-slate-950/45 hover:border-emerald-400/30">
+                Studio
+              </Link>
             </div>
             <button className="btn secondary" onClick={() => setUpgradeOpen(true)}>
               Upgrade to Pro
@@ -1027,6 +1044,17 @@ export default function WorkspaceApp() {
                     </button>
                   ))}
                 </div>
+
+                {studioHandoff && (
+                  <div className="mt-5 rounded-[22px] border border-emerald-400/15 bg-emerald-400/8 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">Imported from Studio</p>
+                    <div className="mt-2 space-y-1 text-sm text-slate-100">
+                      <p className="font-semibold">{studioHandoff.brandName ?? "Studio plan"}</p>
+                      <p className="text-slate-300">{studioHandoff.campaign ?? "Campaign"}</p>
+                      {studioHandoff.fontStyle && <p className="text-slate-400">Typography: {studioHandoff.fontStyle}</p>}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-5 rounded-[22px] border border-white/5 bg-slate-950/45 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Workspace</p>
