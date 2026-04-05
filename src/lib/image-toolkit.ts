@@ -233,6 +233,33 @@ function applyCropRatio(
   return { x, y, width, height };
 }
 
+export function getRotatedBounds(width: number, height: number, rotation: number) {
+  const angle = ((rotation % 360) + 360) % 360;
+  if (!angle) return { width, height };
+  const rad = (angle * Math.PI) / 180;
+  const sin = Math.abs(Math.sin(rad));
+  const cos = Math.abs(Math.cos(rad));
+  return {
+    width: Math.max(1, Math.round(width * cos + height * sin)),
+    height: Math.max(1, Math.round(width * sin + height * cos)),
+  };
+}
+
+function rotateCanvas(canvas: HTMLCanvasElement, rotation: number) {
+  const angle = ((rotation % 360) + 360) % 360;
+  if (!angle) return canvas;
+  const bounds = getRotatedBounds(canvas.width, canvas.height, angle);
+  const rotated = document.createElement("canvas");
+  rotated.width = bounds.width;
+  rotated.height = bounds.height;
+  const ctx = rotated.getContext("2d");
+  if (!ctx) throw new Error("Canvas unavailable");
+  ctx.translate(rotated.width / 2, rotated.height / 2);
+  ctx.rotate((angle * Math.PI) / 180);
+  ctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+  return rotated;
+}
+
 function applyColorAdjustment(ctx: CanvasRenderingContext2D, settings: AdjustSettings) {
   const filters = [];
   if (settings.brightness) filters.push(`brightness(${100 + settings.brightness}%)`);
@@ -335,14 +362,15 @@ export async function processImage(
   if (!sctx) throw new Error("Canvas unavailable");
   sctx.drawImage(baseImage, 0, 0);
 
-  const cropRect = applyCropRatio(settings.crop, sourceCanvas.width, sourceCanvas.height);
+  const rotatedSource = rotateCanvas(sourceCanvas, settings.crop.rotation);
+  const cropRect = applyCropRatio(settings.crop, rotatedSource.width, rotatedSource.height);
   const cropCanvas = document.createElement("canvas");
   cropCanvas.width = cropRect.width;
   cropCanvas.height = cropRect.height;
   const cctx = cropCanvas.getContext("2d");
   if (!cctx) throw new Error("Canvas unavailable");
   cctx.drawImage(
-    sourceCanvas,
+    rotatedSource,
     cropRect.x,
     cropRect.y,
     cropRect.width,

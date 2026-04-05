@@ -14,6 +14,7 @@ import {
   fitsImageFormat,
   formatBytes,
   getMimeForTool,
+  getRotatedBounds,
   processImage,
   uid,
   type AdjustSettings,
@@ -330,17 +331,14 @@ export default function WorkspaceApp() {
   useEffect(() => {
     if (!activeItem || !imageRef.current || tool !== "crop") return;
     const img = imageRef.current;
+    const cropSize = getRotatedBounds(activeItem.width, activeItem.height, settings.crop.rotation);
     const onPointerMove = (ev: PointerEvent) => {
       if (!cropDrag) return;
       const rect = img.getBoundingClientRect();
-      const naturalW = activeItem.width;
-      const naturalH = activeItem.height;
-      const contain = getContainRect(rect.width, rect.height, naturalW, naturalH);
-      const localX = clamp(ev.clientX - rect.left - contain.x, 0, contain.width);
-      const localY = clamp(ev.clientY - rect.top - contain.y, 0, contain.height);
-      const px = clamp(Math.round((localX / contain.width) * naturalW), 0, naturalW);
-      const py = clamp(Math.round((localY / contain.height) * naturalH), 0, naturalH);
-
+      const naturalW = cropSize.width;
+      const naturalH = cropSize.height;
+      const px = clamp(((ev.clientX - rect.left) / rect.width) * naturalW, 0, naturalW);
+      const py = clamp(((ev.clientY - rect.top) / rect.height) * naturalH, 0, naturalH);
       setSettings((prev) => {
         const next = deepCloneSettings(prev);
         const crop = next.crop;
@@ -377,13 +375,14 @@ export default function WorkspaceApp() {
       });
     };
     const onPointerUp = () => setCropDrag(null);
+
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [cropDrag, activeItem, tool]);
+  }, [cropDrag, activeItem, tool, settings.crop.rotation]);
 
   function toast(title: string, body: string) {
     const id = uid("toast");
@@ -631,11 +630,15 @@ export default function WorkspaceApp() {
   const activeProcessedUrl = activeItem?.processedUrl ?? activeBlobUrl;
   const activeProcessedSize = activeItem?.processedSize ?? activeItem?.processedBlob?.size;
   const activePreviewLabel = activeItem ? `${activeItem.width}×${activeItem.height}` : "No image loaded";
+  const cropBounds = useMemo(() => {
+    if (!activeItem) return null;
+    return getRotatedBounds(activeItem.width, activeItem.height, settings.crop.rotation);
+  }, [activeItem, settings.crop.rotation]);
 
   const cropPreviewBox = useMemo(() => {
-    if (!activeItem) return null;
-    return imageCropBox(settings.crop, activeItem.width, activeItem.height);
-  }, [activeItem, settings.crop]);
+    if (!activeItem || !cropBounds) return null;
+    return imageCropBox(settings.crop, cropBounds.width, cropBounds.height);
+  }, [activeItem, cropBounds, settings.crop]);
 
   return (
     <div className="shell">
@@ -858,17 +861,16 @@ export default function WorkspaceApp() {
                           className="max-h-[520px] max-w-full object-contain"
                           onLoad={() => {
                             if (tool === "crop" && activeItem) {
-                              const width = activeItem.width;
-                              const height = activeItem.height;
+                              const bounds = getRotatedBounds(activeItem.width, activeItem.height, settings.crop.rotation);
                               setSettings((prev) => {
                                 const next = deepCloneSettings(prev);
                                 if (!next.crop.width || !next.crop.height) {
-                                  next.crop.width = Math.round(width * 0.75);
-                                  next.crop.height = Math.round(height * 0.75);
+                                  next.crop.width = Math.round(bounds.width * 0.75);
+                                  next.crop.height = Math.round(bounds.height * 0.75);
                                 }
                                 if (!next.crop.x && !next.crop.y) {
-                                  next.crop.x = Math.round((width - next.crop.width) / 2);
-                                  next.crop.y = Math.round((height - next.crop.height) / 2);
+                                  next.crop.x = Math.round((bounds.width - next.crop.width) / 2);
+                                  next.crop.y = Math.round((bounds.height - next.crop.height) / 2);
                                 }
                                 return next;
                               });
@@ -882,10 +884,10 @@ export default function WorkspaceApp() {
                           >
                             {(() => {
                               const rect = previewWrapRef.current?.getBoundingClientRect();
-                              if (!rect || !imageRef.current) return null;
-                              const contain = getContainRect(rect.width - 32, rect.height - 32, activeItem.width, activeItem.height);
-                              const scaleX = contain.width / activeItem.width;
-                              const scaleY = contain.height / activeItem.height;
+                              if (!rect || !imageRef.current || !cropBounds) return null;
+                              const contain = getContainRect(rect.width - 32, rect.height - 32, cropBounds.width, cropBounds.height);
+                              const scaleX = contain.width / cropBounds.width;
+                              const scaleY = contain.height / cropBounds.height;
                               const left = contain.x + cropPreviewBox.x * scaleX + 16;
                               const top = contain.y + cropPreviewBox.y * scaleY + 16;
                               const width = cropPreviewBox.width * scaleX;
@@ -1255,47 +1257,63 @@ export default function WorkspaceApp() {
 
                 {tool === "crop" && (
                   <section className="mt-5 space-y-4 rounded-[22px] border border-white/5 bg-slate-950/45 p-4">
-                    <div>
-                      <label className="mb-2 block text-xs text-slate-400">Aspect ratio</label>
-                      <select className="select-input px-4 py-3 text-sm" value={settings.crop.ratio} onChange={(e) => applySettings((draft) => (draft.crop.ratio = e.target.value))}>
-                        <option value="free">Free</option>
-                        <option value="1:1">1:1</option>
-                        <option value="4:3">4:3</option>
-                        <option value="3:2">3:2</option>
-                        <option value="16:9">16:9</option>
-                        <option value="9:16">9:16</option>
-                        <option value="2:1">2:1</option>
-                      </select>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-100">Crop & rotate</p>
+                        <p className="text-xs text-slate-400">Crop box first, then rotate the canvas.</p>
+                      </div>
+                      <span className="badge">{settings.crop.rotation}°</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label>
-                        <span className="mb-2 block text-xs text-slate-400">X</span>
-                        <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.x} onChange={(e) => applySettings((draft) => (draft.crop.x = Number(e.target.value)))} />
-                      </label>
-                      <label>
-                        <span className="mb-2 block text-xs text-slate-400">Y</span>
-                        <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.y} onChange={(e) => applySettings((draft) => (draft.crop.y = Number(e.target.value)))} />
-                      </label>
-                      <label>
-                        <span className="mb-2 block text-xs text-slate-400">Width</span>
-                        <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.width} onChange={(e) => applySettings((draft) => (draft.crop.width = Number(e.target.value)))} />
-                      </label>
-                      <label>
-                        <span className="mb-2 block text-xs text-slate-400">Height</span>
-                        <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.height} onChange={(e) => applySettings((draft) => (draft.crop.height = Number(e.target.value)))} />
-                      </label>
+
+                    <div className="rounded-[20px] border border-white/5 bg-slate-900/40 p-4">
+                      <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+                        <span>Crop box</span>
+                        <span>{cropBounds ? `${cropBounds.width}×${cropBounds.height}` : "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label>
+                          <span className="mb-2 block text-xs text-slate-400">Aspect ratio</span>
+                          <select className="select-input px-4 py-3 text-sm" value={settings.crop.ratio} onChange={(e) => applySettings((draft) => (draft.crop.ratio = e.target.value))}>
+                            <option value="free">Free</option>
+                            <option value="1:1">1:1</option>
+                            <option value="4:3">4:3</option>
+                            <option value="3:2">3:2</option>
+                            <option value="16:9">16:9</option>
+                            <option value="9:16">9:16</option>
+                            <option value="2:1">2:1</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span className="mb-2 block text-xs text-slate-400">X</span>
+                          <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.x} onChange={(e) => applySettings((draft) => (draft.crop.x = Number(e.target.value)))} />
+                        </label>
+                        <label>
+                          <span className="mb-2 block text-xs text-slate-400">Y</span>
+                          <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.y} onChange={(e) => applySettings((draft) => (draft.crop.y = Number(e.target.value)))} />
+                        </label>
+                        <label>
+                          <span className="mb-2 block text-xs text-slate-400">Width</span>
+                          <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.width} onChange={(e) => applySettings((draft) => (draft.crop.width = Number(e.target.value)))} />
+                        </label>
+                        <label>
+                          <span className="mb-2 block text-xs text-slate-400">Height</span>
+                          <input className="text-input px-4 py-3 text-sm" type="number" value={settings.crop.height} onChange={(e) => applySettings((draft) => (draft.crop.height = Number(e.target.value)))} />
+                        </label>
+                      </div>
                     </div>
-                    <div>
-                      <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
-                        <span>Rotation</span>
+
+                    <div className="rounded-[20px] border border-white/5 bg-slate-900/40 p-4">
+                      <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+                        <span>Rotate canvas</span>
                         <span>{settings.crop.rotation}°</span>
                       </div>
                       <input className="range-input" type="range" min={-15} max={15} step={1} value={settings.crop.rotation} onChange={(e) => applySettings((draft) => (draft.crop.rotation = Number(e.target.value)))} />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button className="btn secondary px-3 py-2 text-xs" onClick={() => applySettings((draft) => (draft.crop.rotation = 0))}>Reset rot</button>
-                      <button className="btn secondary px-3 py-2 text-xs" onClick={() => applySettings((draft) => (draft.crop.rotation = 90))}>90°</button>
-                      <button className="btn secondary px-3 py-2 text-xs" onClick={() => applySettings((draft) => (draft.crop.rotation = 180))}>180°</button>
+                      <div className="mt-3 grid grid-cols-4 gap-2">
+                        <button className="btn secondary px-3 py-2 text-xs" onClick={() => applySettings((draft) => (draft.crop.rotation = 0))}>Reset</button>
+                        <button className="btn secondary px-3 py-2 text-xs" onClick={() => applySettings((draft) => (draft.crop.rotation = -90))}>-90°</button>
+                        <button className="btn secondary px-3 py-2 text-xs" onClick={() => applySettings((draft) => (draft.crop.rotation = 90))}>90°</button>
+                        <button className="btn secondary px-3 py-2 text-xs" onClick={() => applySettings((draft) => (draft.crop.rotation = 180))}>180°</button>
+                      </div>
                     </div>
                   </section>
                 )}
