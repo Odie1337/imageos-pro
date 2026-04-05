@@ -20,9 +20,8 @@ const display = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "ImageOS — The image workspace people keep open",
-  description:
-    "A premium, batch-first image editing workspace for resizing, compressing, converting, cropping, adjusting, and exporting at scale.",
+  title: "ImageOS — calm image workspace",
+  description: "A minimal batch image workspace for fast edits, recipes, and clean exports.",
   metadataBase: new URL("https://imageos.local"),
 };
 

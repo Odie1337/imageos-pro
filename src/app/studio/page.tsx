@@ -22,8 +22,8 @@ export default function StudioPage() {
   const [campaign, setCampaign] = useState("Spring launch pack");
   const [fontStyle, setFontStyle] = useState("Space Grotesk");
   const [selectedPalette, setSelectedPalette] = useState(palettes[0]);
-  const [tagline, setTagline] = useState("Polished image workflows for modern teams");
-  const [campaignAngle, setCampaignAngle] = useState("Product launch assets, social crops, and compressed delivery.");
+  const [tagline, setTagline] = useState("Polished image workflows");
+  const [campaignAngle, setCampaignAngle] = useState("Product launch assets, social crops, compressed delivery.");
 
   const preview = useMemo(
     () => ({

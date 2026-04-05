@@ -18,32 +18,29 @@ export default function LibraryPage() {
 
   return (
     <div className="shell">
-      <div className="container py-5 md:py-6">
-        <div className="glass flex items-center justify-between rounded-[28px] px-4 py-4 md:px-6">
+      <main className="container py-5 md:py-6 pb-10">
+        <div className="glass flex items-center justify-between rounded-[24px] px-4 py-4 md:px-6">
           <div>
-            <h1 className="hero-title text-xl font-semibold md:text-2xl">Recipe Library</h1>
-            <p className="mt-1 text-sm text-slate-400">Saved locally, applied instantly, designed for repeat use.</p>
+            <h1 className="hero-title text-lg font-semibold md:text-xl">Library</h1>
+            <p className="text-sm text-slate-400">Saved recipes, kept local.</p>
           </div>
-          <Link href="/workspace" className="btn secondary">Back to workspace</Link>
+          <Link href="/workspace" className="btn secondary">Workspace</Link>
         </div>
-      </div>
 
-      <main className="container pb-10">
-        <div className="card p-6">
+        <div className="mt-6 card p-5 md:p-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {recipes.length === 0 ? (
-              <div className="rounded-[22px] border border-white/5 bg-slate-950/45 p-5 text-sm text-slate-400 md:col-span-2 xl:col-span-3">
-                No recipes yet. Save one in the workspace and it will appear here.
+              <div className="rounded-[20px] border border-white/5 bg-slate-950/45 p-5 text-sm text-slate-400 md:col-span-2 xl:col-span-3">
+                No saved recipes yet. Create one in Workspace.
               </div>
             ) : (
               recipes.map((recipe) => (
-                <div key={recipe.id} className="rounded-[22px] border border-white/5 bg-slate-950/45 p-5">
+                <div key={recipe.id} className="rounded-[20px] border border-white/5 bg-slate-950/45 p-5">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="font-semibold text-slate-100">{recipe.name}</h3>
                     <span className="badge">{recipe.tool}</span>
                   </div>
-                  <p className="mt-2 text-sm text-slate-400">{new Date(recipe.createdAt).toLocaleString()}</p>
-                  <p className="mt-4 text-xs text-slate-500">Stored in local browser storage.</p>
+                  <p className="mt-2 text-sm text-slate-400">{new Date(recipe.createdAt).toLocaleDateString()}</p>
                 </div>
               ))
             )}
